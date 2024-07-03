@@ -1,0 +1,60 @@
+--- #
+- hosts: all
+  name: root
+  become: yes
+  tasks:
+    - name: install samba server
+      apt:
+        name: samba
+        state: latest
+    - name: createion of  group
+      group:
+         name: "smbuser"
+         state: present
+    - name: create users
+      user:
+        name: test1
+        state: present
+        shell: "/sbin/nologin"
+        append: yes
+        group: "smbuser"
+        create_home: no
+    - name: create directory to share
+      file:
+        path: /shared/smbshare
+        state: directory
+        owner: root
+        group: smbuser
+        mode: "2775"
+        setype: "samba_share_t"
+    - name: add smb user and set passwd
+      shell: smbpasswd -a test1
+      args:
+        stdin: "S0ftw@re\nS0ftw@re"  # passwor add two time
+    - name: configure the samba share
+      blockinfile:
+        path: /etc/samba/smb.conf
+        block: |
+          [testshare]
+                  path = /share/smbshare
+                  guest ok = no
+                  writable = yes
+                  browsable = yes
+                  vaild users = test1,@smbusers
+                  write list = @smbusers
+      notify:
+           - start_samba
+           - open_port
+  handlers:
+    - name: start_samba
+      service:
+        name: smb
+        state: started
+        # - name: open_port
+        #firewalld:
+        # service:
+        # name: samba
+        #state: enable
+        #immediate: yes
+        #permanent: yes
+
